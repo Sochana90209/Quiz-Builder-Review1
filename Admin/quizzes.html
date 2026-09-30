@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Your Quizzes — Quiz Builder</title>
+    <link rel="stylesheet" href="../Shared/styles.css">
+</head>
+<body>
+    <div data-topbar></div>
+
+    <div class="layout">
+        <div data-sidebar></div>
+
+        <main class="main">
+            <div class="page-head">
+                <div>
+                    <h1>Your Quizzes</h1>
+                    <p>Manage your quizzes and share codes with participants.</p>
+                </div>
+                <a class="btn btn-primary" href="create.html">＋ Create New Quiz</a>
+            </div>
+
+            <div id="list" class="quiz-list"></div>
+        </main>
+    </div>
+
+    <script src="../Shared/storage.js"></script>
+    <script src="../Shared/app.js"></script>
+    <script>
+        const user = QBApp.requireRole('creator');
+        const list = document.getElementById('list');
+
+        if (user) {
+            QBApp.shell('quizzes');
+
+            const quizzes = QBStorage.owned(user.id);
+
+            list.innerHTML = quizzes.length
+                ? quizzes.map(quiz => `
+                    <article class="card card-hover quiz-row">
+                        <div>
+                            <h2 class="quiz-title">
+                                🧠 ${QBApp.escapeHtml(quiz.title)}
+                            </h2>
+                            <div class="quiz-meta">
+                                ${QBApp.escapeHtml(quiz.category || 'General')}
+                                · ${quiz.questions.length} Questions
+                                · ${Math.round(quiz.timeLimitSeconds / 60)} min
+                            </div>
+                            <div class="quiz-code-wrap">
+                                <span class="code">${QBApp.escapeHtml(quiz.code)}</span>
+                            </div>
+                        </div>
+
+                        <div class="actions">
+                            <button class="btn btn-sm" data-share="${QBApp.escapeHtml(quiz.code)}">
+                                Share Code
+                            </button>
+                            <a class="btn btn-sm" href="create.html?quiz=${encodeURIComponent(quiz.id)}">
+                                Edit
+                            </a>
+                            <a class="btn btn-sm btn-primary" href="../User/play.html?quiz=${encodeURIComponent(quiz.id)}&mode=preview">
+                                ▶ Play
+                            </a>
+                            <a class="btn btn-sm" href="creator-results.html?quiz=${encodeURIComponent(quiz.id)}">
+                                Results
+                            </a>
+                            <button class="btn btn-sm btn-danger" data-delete="${QBApp.escapeHtml(quiz.id)}">
+                                Delete
+                            </button>
+                        </div>
+                    </article>
+                `).join('')
+                : `
+                    <div class="card pad center">
+                        <p class="muted">No quizzes yet.</p>
+                        <a class="btn btn-primary" href="create.html">
+                            Create your first quiz
+                        </a>
+                    </div>
+                `;
+
+            document.querySelectorAll('[data-share]').forEach(button => {
+                button.addEventListener('click', async () => {
+                    const quizCode = button.dataset.share;
+
+                    try {
+                        if (navigator.clipboard) {
+                            await navigator.clipboard.writeText(quizCode);
+                        }
+                        alert(`Quiz code copied: ${quizCode}`);
+                    } catch (error) {
+                        alert(`Quiz code: ${quizCode}`);
+                    }
+                });
+            });
+
+            document.querySelectorAll('[data-delete]').forEach(button => {
+                button.addEventListener('click', () => {
+                    const quiz = QBStorage.getQuiz(button.dataset.delete);
+                    if (!quiz) return;
+
+                    if (confirm(`Delete "${quiz.title}"?`)) {
+                        QBStorage.deleteQuiz(quiz.id);
+                        location.reload();
+                    }
+                });
+            });
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Profile — Quiz Builder</title>
+    <link rel="stylesheet" href="../Shared/styles.css">
+</head>
+<body>
+    <div data-topbar></div>
+
+    <div class="layout">
+        <div data-sidebar></div>
+
+        <main class="main">
+            <div class="page-head">
+                <div>
+                    <h1>Profile</h1>
+                    <p>Your Quiz Builder account information.</p>
+                </div>
+            </div>
+
+            <section class="card pad profile-card">
+                <div class="field">
+                    <label for="name">Name</label>
+                    <input id="name" readonly>
+                </div>
+
+                <div class="field">
+                    <label for="email">Email</label>
+                    <input id="email" readonly>
+                </div>
+
+                <div class="field">
+                    <label for="role">Role</label>
+                    <input id="role" value="Creator / Admin" readonly>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="../Shared/storage.js"></script>
+    <script src="../Shared/app.js"></script>
+    <script>
+        const user = QBApp.requireRole('creator');
+
+        if (user) {
+            QBApp.shell('profile');
+            document.getElementById('name').value = user.name;
+            document.getElementById('email').value = user.email;
+        }
+    </script>
+</body>
+</html>

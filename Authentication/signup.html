@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Sign Up — Quiz Builder</title>
+    <link rel="stylesheet" href="../Shared/styles.css">
+</head>
+<body>
+    <main class="auth">
+        <div class="auth-wrap">
+            <section class="card auth-card">
+                <div class="brand" style="margin-bottom: 22px;">
+                    <span class="brand-icon">💡</span>
+                    <span>
+                        <span class="brand-title">Quiz Builder</span>
+                        <span class="brand-sub">Create • Play • Learn</span>
+                    </span>
+                </div>
+
+                <h1>Create Your Account</h1>
+                <p class="sub">Join and start your quiz journey!</p>
+
+                <div id="error" class="error hidden"></div>
+
+                <form id="form" class="form">
+                    <div class="field">
+                        <label for="name">Full Name</label>
+                        <input
+                            id="name"
+                            required
+                            maxlength="60"
+                            autocomplete="name"
+                            placeholder="Enter your name"
+                        >
+                    </div>
+
+                    <div class="field">
+                        <label for="email">Email Address</label>
+                        <input
+                            id="email"
+                            type="email"
+                            required
+                            autocomplete="email"
+                            placeholder="you@example.com"
+                        >
+                    </div>
+
+                    <div class="field">
+                        <label for="password">Password</label>
+                        <input
+                            id="password"
+                            type="password"
+                            minlength="6"
+                            required
+                            autocomplete="new-password"
+                            placeholder="At least 6 characters"
+                        >
+                    </div>
+
+                    <div class="field">
+                        <label for="confirm">Confirm Password</label>
+                        <input
+                            id="confirm"
+                            type="password"
+                            minlength="6"
+                            required
+                            autocomplete="new-password"
+                            placeholder="Re-enter password"
+                        >
+                    </div>
+
+                    <button type="submit" class="btn btn-primary btn-block">
+                        Sign Up
+                    </button>
+                </form>
+
+                <p class="auth-links">
+                    Already have an account? <a href="login.html">Login</a>
+                </p>
+            </section>
+
+            <section class="auth-art">
+                <img
+                    class="mascot"
+                    src="../Shared/assets/mascot-jellyfish.png"
+                    alt="Cute glowing jellyfish mascot"
+                >
+                <div class="hand">Small steps, big dreams!</div>
+            </section>
+        </div>
+    </main>
+
+    <script src="../Shared/storage.js"></script>
+    <script src="../Shared/app.js"></script>
+    <script>
+        const form = document.getElementById('form');
+        const nameInput = document.getElementById('name');
+        const emailInput = document.getElementById('email');
+        const passwordInput = document.getElementById('password');
+        const confirmInput = document.getElementById('confirm');
+        const errorBox = document.getElementById('error');
+
+        form.addEventListener('submit', event => {
+            event.preventDefault();
+
+            if (passwordInput.value !== confirmInput.value) {
+                errorBox.textContent = 'Passwords do not match.';
+                errorBox.classList.remove('hidden');
+                return;
+            }
+
+            errorBox.classList.add('hidden');
+
+            sessionStorage.setItem(
+                'qb.pendingSignup',
+                JSON.stringify({
+                    name: nameInput.value,
+                    email: emailInput.value,
+                    password: passwordInput.value
+                })
+            );
+
+            location.href = 'role.html';
+        });
+    </script>
+</body>
+</html>

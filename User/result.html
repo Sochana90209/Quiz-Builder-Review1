@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Quiz Result — Quiz Builder</title>
+    <link rel="stylesheet" href="../Shared/styles.css">
+</head>
+<body>
+    <div data-topbar></div>
+
+    <main class="main">
+        <section id="summary" class="card result-card"></section>
+        <section id="review" class="review"></section>
+    </main>
+
+    <script src="../Shared/storage.js"></script>
+    <script src="../Shared/app.js"></script>
+    <script>
+        const topbar = document.querySelector('[data-topbar]');
+        const summary = document.getElementById('summary');
+        const review = document.getElementById('review');
+        const attemptId = new URLSearchParams(location.search).get('attempt');
+        const attempt = QBStorage.getAttempt(attemptId);
+        const backLink = attempt?.creatorPreview ? '../Admin/quizzes.html' : 'join.html';
+
+        topbar.innerHTML = `
+            <header class="topbar">
+                <a class="brand" href="${backLink}">
+                    <span class="brand-icon">💡</span>
+                    <span>
+                        <span class="brand-title">Quiz Builder</span>
+                        <span class="brand-sub">Create • Play • Learn</span>
+                    </span>
+                </a>
+                <div class="user-chip">Quiz Result</div>
+            </header>
+        `;
+
+        if (!attempt) {
+            summary.innerHTML = `
+                <h1>No result found</h1>
+                <a class="btn btn-primary" href="join.html">Back to Join</a>
+            `;
+        } else {
+            const result = attempt.result;
+
+            summary.innerHTML = `
+                <img
+                    class="result-mascot"
+                    src="../Shared/assets/mascot-penguin.png"
+                    alt="Cute glowing penguin mascot"
+                >
+                <h1>✨ Quiz Completed! ✨</h1>
+                <p class="muted">
+                    ${QBApp.escapeHtml(attempt.quizTitle)} ·
+                    ${QBApp.escapeHtml(attempt.participantName)}
+                </p>
+                <div class="score">${result.correct}/${result.total}</div>
+                <h2>${result.percent}%</h2>
+                <p>
+                    <span class="pill">✓ Correct ${result.correct}</span>
+                    <span class="pill">✕ Wrong ${result.wrong}</span>
+                    <span class="pill">– Skipped ${result.skipped}</span>
+                </p>
+                <a class="btn btn-primary" href="#review">
+                    View Answers & Explanation
+                </a>
+                <a class="btn" href="${backLink}">${attempt.creatorPreview ? "Back to Your Quizzes" : "Back to Home"}</a>
+            `;
+
+            review.innerHTML = `
+                <h2>Answer Review & Explanation</h2>
+                ${result.details.map((detail, index) => `
+                    <article class="card review-item ${detail.correct ? 'correct' : 'wrong'}">
+                        <strong>
+                            ${index + 1}. ${QBApp.escapeHtml(detail.text)}
+                        </strong>
+
+                        <div class="review-row">
+                            Your Answer:
+                            <span class="${detail.correct ? 'correct-text' : 'wrong-text'}">
+                                ${QBApp.escapeHtml(detail.givenText)}
+                            </span>
+                        </div>
+
+                        <div class="review-row">
+                            Correct Answer:
+                            <span class="correct-text">
+                                ${QBApp.escapeHtml(detail.correctText)}
+                            </span>
+                        </div>
+
+                        ${detail.explanation ? `
+                            <div class="explanation">
+                                <strong>Explanation:</strong>
+                                ${QBApp.escapeHtml(detail.explanation)}
+                            </div>
+                        ` : ''}
+                    </article>
+                `).join('')}
+            `;
+        }
+    </script>
+</body>
+</html>

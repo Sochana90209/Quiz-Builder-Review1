@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Dashboard — Quiz Builder</title>
+    <link rel="stylesheet" href="../Shared/styles.css">
+</head>
+<body>
+    <div data-topbar></div>
+
+    <div class="layout">
+        <div data-sidebar></div>
+
+        <main class="main">
+            <section class="hero card">
+                <div class="hero-copy">
+                    <h1>Dashboard</h1>
+                    <p>Manage your quizzes and track participant performance.</p>
+                    <a class="btn btn-primary" href="create.html">＋ Create Quiz</a>
+                </div>
+                <img
+                    class="hero-art"
+                    src="../Shared/assets/mascot-jellyfish.png"
+                    alt="Cute glowing jellyfish mascot"
+                >
+            </section>
+
+            <div class="grid stats">
+                <div class="card stat cyan">
+                    <div class="ico">▣</div>
+                    <strong id="quizCount">0</strong>
+                    <span>Total Quizzes</span>
+                </div>
+
+                <div class="card stat green">
+                    <div class="ico">♙</div>
+                    <strong id="attemptCount">0</strong>
+                    <span>Total Attempts</span>
+                </div>
+
+                <div class="card stat gold">
+                    <div class="ico">★</div>
+                    <strong id="avgScore">0%</strong>
+                    <span>Average Score</span>
+                </div>
+            </div>
+
+            <h2 class="section-heading">Quick Actions</h2>
+
+            <div class="grid quick">
+                <a class="card card-hover quick-card" href="create.html">
+                    <div class="big">＋</div>
+                    <strong>Create Quiz</strong>
+                    <p class="muted small">Build a new quiz</p>
+                </a>
+
+                <a class="card card-hover quick-card" href="creator-results.html">
+                    <div class="big">▥</div>
+                    <strong>View Results</strong>
+                    <p class="muted small">Track participant scores</p>
+                </a>
+
+                <a class="card card-hover quick-card" href="quizzes.html">
+                    <div class="big">▶</div>
+                    <strong>Play Your Quiz</strong>
+                    <p class="muted small">Preview and play a created quiz</p>
+                </a>
+            </div>
+        </main>
+    </div>
+
+    <script src="../Shared/storage.js"></script>
+    <script src="../Shared/app.js"></script>
+    <script>
+        const user = QBApp.requireRole('creator');
+
+        if (user) {
+            QBApp.shell('dashboard');
+
+            const quizCount = document.getElementById('quizCount');
+            const attemptCount = document.getElementById('attemptCount');
+            const avgScore = document.getElementById('avgScore');
+
+            const quizzes = QBStorage.owned(user.id);
+            const quizIds = quizzes.map(quiz => quiz.id);
+            const attempts = QBStorage
+                .attempts()
+                .filter(attempt => quizIds.includes(attempt.quizId));
+
+            quizCount.textContent = quizzes.length;
+            attemptCount.textContent = attempts.length;
+
+            const scores = attempts.map(attempt => attempt.result?.percent || 0);
+            const average = scores.length
+                ? Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length)
+                : 0;
+
+            avgScore.textContent = `${average}%`;
+        }
+    </script>
+</body>
+</html>

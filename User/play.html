@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Play Quiz — Quiz Builder</title>
+    <link rel="stylesheet" href="../Shared/styles.css">
+</head>
+<body>
+    <div data-topbar></div>
+
+    <main class="main">
+        <div id="app"></div>
+    </main>
+
+    <script src="../Shared/storage.js"></script>
+    <script src="../Shared/app.js"></script>
+    <script>
+        const currentUser = QBStorage.session();
+        const params = new URLSearchParams(location.search);
+        const previewQuizId = params.get('quiz');
+        const isCreatorPreview = currentUser?.role === 'creator' && previewQuizId;
+
+        if (isCreatorPreview) {
+            const previewQuiz = QBStorage.getQuiz(previewQuizId);
+
+            if (!previewQuiz || previewQuiz.ownerId !== currentUser.id) {
+                location.href = '../Admin/quizzes.html';
+            } else if (!previewQuiz.questions?.length) {
+                alert('Add at least one question before playing this quiz.');
+                location.href = '../Admin/create.html?quiz=' + encodeURIComponent(previewQuiz.id);
+            } else {
+                QBStorage.setActive({
+                    quizId: previewQuiz.id,
+                    participantName: currentUser.name + ' (Creator Preview)',
+                    participantUserId: currentUser.id,
+                    creatorPreview: true,
+                    index: 0,
+                    answers: {},
+                    endsAt: Date.now() + (previewQuiz.timeLimitSeconds || 600) * 1000
+                });
+                location.replace('play.html');
+            }
+        } else {
+            const activeAttempt = QBStorage.active();
+
+            if (!activeAttempt) {
+                location.href = currentUser?.role === 'creator'
+                    ? '../Admin/quizzes.html'
+                    : 'join.html';
+            } else {
+                const quiz = QBStorage.getQuiz(activeAttempt.quizId);
+
+                if (!quiz || !quiz.questions?.length) {
+                    QBStorage.clearActive();
+                    location.href = currentUser?.role === 'creator'
+                        ? '../Admin/quizzes.html'
+                        : 'join.html';
+                } else {
+                    const topbar = document.querySelector('[data-topbar]');
+                    const app = document.getElementById('app');
+                    const home = activeAttempt.creatorPreview
+                        ? '../Admin/quizzes.html'
+                        : 'join.html';
+                    const label = activeAttempt.creatorPreview
+                        ? 'Creator Preview · ' + activeAttempt.participantName.replace(' (Creator Preview)', '')
+                        : 'Participant · ' + activeAttempt.participantName;
+
+                    topbar.innerHTML = `
+                        <header class="topbar">
+                            <a class="brand" href="${home}">
+                                <span class="brand-icon">💡</span>
+                                <span>
+                                    <span class="brand-title">Quiz Builder</span>
+                                    <span class="brand-sub">Create • Play • Learn</span>
+                                </span>
+                            </a>
+                            <div class="user-chip">${QBApp.escapeHtml(label)}</div>
+                        </header>
+                    `;
+
+                    let state = {
+                        ...activeAttempt,
+                        answers: { ...(activeAttempt.answers || {}) },
+                        index: Math.min(
+                            Math.max(Number(activeAttempt.index) || 0, 0),
+                            quiz.questions.length - 1
+                        )
+                    };
+
+                    let submitted = false;
+
+                    function save() {
+                        QBStorage.setActive({ ...state });
+                    }
+
+                    function finish(autoSubmitted) {
+                        if (submitted) return;
+
+                        submitted = true;
+                        save();
+
+                        const result = QBStorage.scoreQuiz(quiz, state.answers);
+                        const attempt = QBStorage.saveAttempt({
+                            quizId: quiz.id,
+                            quizTitle: quiz.title,
+                            quizCode: quiz.code,
+                            participantName: state.participantName,
+                            participantUserId: state.participantUserId || '',
+                            creatorPreview: Boolean(state.creatorPreview),
+                            answers: state.answers,
+                            result,
+                            autoSubmitted
+                        });
+
+                        QBStorage.clearActive();
+                        location.href = `result.html?attempt=${encodeURIComponent(attempt.id)}`;
+                    }
+
+                    function render() {
+                        const question = quiz.questions[state.index];
+                        const progress = Math.round(
+                            ((state.index + 1) / quiz.questions.length) * 100
+                        );
+
+                        const labels = question.type === 'true-false'
+                            ? ['True', 'False']
+                            : question.options || [];
+
+                        const typeLabel = question.type === 'multiple-choice'
+                            ? 'Multiple Choice'
+                            : question.type === 'true-false'
+                                ? 'True / False'
+                                : 'Text Answer';
+
+                        app.innerHTML = `
+                            <div class="play-top">
+                                <div>
+                                    <h1 class="play-title">${QBApp.escapeHtml(quiz.title)}</h1>
+                                    <div class="muted small">Question ${state.index + 1} of ${quiz.questions.length}</div>
+                                </div>
+                                <div class="timer" id="timer">00:00</div>
+                            </div>
+
+                            <div class="progress" aria-label="Quiz progress">
+                                <span style="width: ${progress}%;"></span>
+                            </div>
+
+                            <div class="play-grid">
+                                <section class="card pad">
+                                    <div class="pill">${typeLabel}</div>
+                                    <h2 class="play-question">${QBApp.escapeHtml(question.text)}</h2>
+
+                                    ${question.image ? `
+                                        <img class="question-image play-question-image" src="${question.image}" alt="Question image">
+                                    ` : ''}
+
+                                    <div class="answer-list">
+                                        ${question.type === 'text' ? `
+                                            <div class="field">
+                                                <label for="textAnswer">Your Answer</label>
+                                                <input id="textAnswer" value="${QBApp.escapeHtml(state.answers[question.id] || '')}" placeholder="Type your answer" autocomplete="off">
+                                            </div>
+                                        ` : labels.map((label, index) => {
+                                            const value = question.type === 'true-false'
+                                                ? (index === 0 ? 'true' : 'false')
+                                                : String(index);
+                                            const selected = String(state.answers[question.id]) === value;
+                                            return `
+                                                <label class="answer ${selected ? 'selected' : ''}">
+                                                    <input type="radio" name="answer" value="${value}" ${selected ? 'checked' : ''}>
+                                                    <span>${QBApp.escapeHtml(label)}</span>
+                                                </label>
+                                            `;
+                                        }).join('')}
+                                    </div>
+
+                                    <div class="play-actions">
+                                        <button type="button" class="btn" id="prev" ${state.index === 0 ? 'disabled' : ''}>← Previous</button>
+                                        ${state.index === quiz.questions.length - 1
+                                            ? '<button type="button" class="btn btn-primary" id="submit">Submit Quiz</button>'
+                                            : '<button type="button" class="btn btn-primary" id="next">Next →</button>'}
+                                    </div>
+                                </section>
+
+                                <aside class="play-side-art">
+                                    <img class="play-art" src="../Shared/assets/mascot-astronaut.png" alt="Cute glowing astronaut mascot">
+                                    <div class="hand center">You can do it!</div>
+                                </aside>
+                            </div>
+                        `;
+
+                        document.querySelectorAll('input[name="answer"]').forEach(input => {
+                            input.addEventListener('change', () => {
+                                state.answers[question.id] = input.value;
+                                save();
+                                render();
+                            });
+                        });
+
+                        const textAnswer = document.getElementById('textAnswer');
+                        if (textAnswer) {
+                            textAnswer.addEventListener('input', () => {
+                                state.answers[question.id] = textAnswer.value;
+                                save();
+                            });
+                        }
+
+                        document.getElementById('prev')?.addEventListener('click', () => {
+                            if (state.index <= 0) return;
+                            state.index -= 1;
+                            save();
+                            render();
+                        });
+
+                        document.getElementById('next')?.addEventListener('click', () => {
+                            if (state.index >= quiz.questions.length - 1) return;
+                            state.index += 1;
+                            save();
+                            render();
+                        });
+
+                        document.getElementById('submit')?.addEventListener('click', () => finish(false));
+                    }
+
+                    function updateTimer() {
+                        const current = QBStorage.active();
+                        if (!current) return;
+
+                        const secondsLeft = Math.max(0, Math.round((current.endsAt - Date.now()) / 1000));
+                        const minutes = String(Math.floor(secondsLeft / 60)).padStart(2, '0');
+                        const seconds = String(secondsLeft % 60).padStart(2, '0');
+                        const timer = document.getElementById('timer');
+
+                        if (timer) {
+                            timer.textContent = `${minutes}:${seconds}`;
+                            timer.classList.toggle('warning', secondsLeft < 30);
+                        }
+
+                        if (secondsLeft <= 0) finish(true);
+                    }
+
+                    render();
+                    updateTimer();
+                    setInterval(updateTimer, 1000);
+                }
+            }
+        }
+    </script>
+</body>
+</html>

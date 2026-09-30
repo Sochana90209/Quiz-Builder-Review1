@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Results — Quiz Builder</title>
+    <link rel="stylesheet" href="../Shared/styles.css">
+</head>
+<body>
+    <div data-topbar></div>
+
+    <div class="layout">
+        <div data-sidebar></div>
+
+        <main class="main">
+            <div class="page-head">
+                <div>
+                    <h1>Results</h1>
+                    <p>View participant submissions for quizzes you created.</p>
+                </div>
+            </div>
+
+            <section class="card pad table-wrap">
+                <table class="results-table">
+                    <thead>
+                        <tr>
+                            <th>Participant</th>
+                            <th>Quiz</th>
+                            <th>Score</th>
+                            <th>Correct</th>
+                            <th>Submitted</th>
+                        </tr>
+                    </thead>
+                    <tbody id="rows"></tbody>
+                </table>
+            </section>
+        </main>
+    </div>
+
+    <script src="../Shared/storage.js"></script>
+    <script src="../Shared/app.js"></script>
+    <script>
+        const user = QBApp.requireRole('creator');
+        const rows = document.getElementById('rows');
+
+        if (user) {
+            QBApp.shell('results');
+
+            const ownedIds = QBStorage.owned(user.id).map(quiz => quiz.id);
+            let attempts = QBStorage
+                .attempts()
+                .filter(attempt => ownedIds.includes(attempt.quizId));
+
+            const filterQuiz = new URLSearchParams(location.search).get('quiz');
+
+            if (filterQuiz) {
+                attempts = attempts.filter(attempt => attempt.quizId === filterQuiz);
+            }
+
+            attempts.sort((a, b) => b.submittedAt.localeCompare(a.submittedAt));
+
+            rows.innerHTML = attempts.length
+                ? attempts.map(attempt => `
+                    <tr>
+                        <td>${QBApp.escapeHtml(attempt.participantName)}</td>
+                        <td>
+                            ${QBApp.escapeHtml(attempt.quizTitle)}<br>
+                            <span class="pill">${QBApp.escapeHtml(attempt.quizCode)}</span>
+                        </td>
+                        <td><strong>${attempt.result.percent}%</strong></td>
+                        <td>${attempt.result.correct}/${attempt.result.total}</td>
+                        <td>${new Date(attempt.submittedAt).toLocaleString()}</td>
+                    </tr>
+                `).join('')
+                : `
+                    <tr>
+                        <td colspan="5" class="center muted">
+                            No participant submissions yet.
+                        </td>
+                    </tr>
+                `;
+        }
+    </script>
+</body>
+</html>

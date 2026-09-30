@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Choose Role — Quiz Builder</title>
+    <link rel="stylesheet" href="../Shared/styles.css">
+</head>
+<body>
+    <main class="role-wrap">
+        <section class="role-box">
+            <div class="brand">
+                <span class="brand-icon">💡</span>
+                <span>
+                    <span class="brand-title">Quiz Builder</span>
+                    <span class="brand-sub">Create • Play • Learn</span>
+                </span>
+            </div>
+
+            <div class="role-head">
+                <h1>Choose Your Role</h1>
+                <p>What would you like to do today?</p>
+            </div>
+
+            <div id="error" class="error hidden"></div>
+
+            <div class="role-grid">
+                <article class="card role-card creator">
+                    <div class="role-icon">📝</div>
+                    <h2>Creator</h2>
+                    <p>
+                        Create and manage quizzes, publish codes and view participant results.
+                    </p>
+                    <button type="button" class="btn btn-primary" data-role="creator">
+                        Continue
+                    </button>
+                </article>
+
+                <article class="card role-card participant">
+                    <div class="role-icon">🎮</div>
+                    <h2>Participant</h2>
+                    <p>
+                        Join a quiz using a code, answer questions and view explanations.
+                    </p>
+                    <button type="button" class="btn btn-primary" data-role="participant">
+                        Continue
+                    </button>
+                </article>
+            </div>
+
+            <p class="center auth-links" style="margin-top: 20px;">
+                <a href="login.html">Back to Login</a>
+            </p>
+        </section>
+    </main>
+
+    <script src="../Shared/storage.js"></script>
+    <script src="../Shared/app.js"></script>
+    <script>
+        const errorBox = document.getElementById('error');
+
+        document.querySelectorAll('[data-role]').forEach(button => {
+            button.addEventListener('click', () => {
+                const pending = sessionStorage.getItem('qb.pendingSignup');
+
+                if (!pending) {
+                    location.href = button.dataset.role === 'creator'
+                        ? '../Admin/dashboard.html'
+                        : '../User/join.html';
+                    return;
+                }
+
+                let signupData;
+
+                try {
+                    signupData = JSON.parse(pending);
+                } catch (error) {
+                    errorBox.textContent = 'Signup information is invalid. Please start again.';
+                    errorBox.classList.remove('hidden');
+                    return;
+                }
+
+                const result = QBStorage.signup(
+                    signupData.name,
+                    signupData.email,
+                    signupData.password,
+                    button.dataset.role
+                );
+
+                if (!result.ok) {
+                    errorBox.textContent = result.error;
+                    errorBox.classList.remove('hidden');
+                    return;
+                }
+
+                sessionStorage.removeItem('qb.pendingSignup');
+
+                location.href = button.dataset.role === 'creator'
+                    ? '../Admin/dashboard.html'
+                    : '../User/join.html';
+            });
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,523 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Create Quiz — Quiz Builder</title>
+    <link rel="stylesheet" href="../Shared/styles.css">
+</head>
+<body>
+    <div data-topbar></div>
+
+    <div class="layout">
+        <div data-sidebar></div>
+
+        <main class="main">
+            <div class="page-head">
+                <div>
+                    <h1 id="pageTitle">Create Quiz</h1>
+                    <p>Create your quiz, add questions, set correct answers and provide explanations.</p>
+                </div>
+            </div>
+
+            <section class="card pad">
+                <form id="quizForm" class="form">
+                    <div class="create-info-grid">
+                        <div class="field">
+                            <label for="title">Quiz Title</label>
+                            <input
+                                id="title"
+                                required
+                                maxlength="100"
+                                placeholder="e.g. Brain Booster – Logical Thinking Challenge"
+                            >
+                        </div>
+
+                        <div class="field">
+                            <label for="category">Category</label>
+                            <select id="category">
+                                <option>Logical Thinking</option>
+                                <option>General Knowledge</option>
+                                <option>Science</option>
+                                <option>Mathematics</option>
+                                <option>Programming</option>
+                                <option>Other</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label for="description">Description</label>
+                        <textarea
+                            id="description"
+                            rows="4"
+                            placeholder="Describe what participants will learn or test..."
+                        ></textarea>
+                    </div>
+
+                    <div class="field time-field">
+                        <label for="time">Time Limit (minutes)</label>
+                        <input id="time" type="number" min="1" max="120" value="10" required>
+                        <span class="hint">Participants will be automatically submitted when the timer reaches zero.</span>
+                    </div>
+                </form>
+            </section>
+
+            <div class="steps create-steps">
+                <span class="step active">① Question</span>
+                <span class="step">② Options</span>
+                <span class="step">③ Explanation</span>
+            </div>
+
+            <section id="questions" aria-live="polite"></section>
+
+            <div class="create-actions">
+                <button id="addQuestion" type="button" class="btn btn-primary">
+                    ＋ Add Question
+                </button>
+                <button id="saveQuiz" type="button" class="btn">
+                    ✓ Publish Quiz
+                </button>
+            </div>
+
+            <div id="msg" class="success hidden" role="status"></div>
+        </main>
+    </div>
+
+    <script src="../Shared/storage.js"></script>
+    <script src="../Shared/app.js"></script>
+
+    <script>
+        const user = QBApp.requireRole('creator');
+
+        if (user) {
+            QBApp.shell('create');
+
+            const titleInput = document.getElementById('title');
+            const categoryInput = document.getElementById('category');
+            const descriptionInput = document.getElementById('description');
+            const timeInput = document.getElementById('time');
+            const questionsContainer = document.getElementById('questions');
+            const pageTitle = document.getElementById('pageTitle');
+            const message = document.getElementById('msg');
+            const addQuestionButton = document.getElementById('addQuestion');
+            const saveQuizButton = document.getElementById('saveQuiz');
+
+            let questions = [];
+            const editingId = new URLSearchParams(location.search).get('quiz');
+
+            if (editingId) {
+                const oldQuiz = QBStorage.getQuiz(editingId);
+
+                if (oldQuiz && oldQuiz.ownerId === user.id) {
+                    titleInput.value = oldQuiz.title || '';
+                    descriptionInput.value = oldQuiz.description || '';
+                    timeInput.value = Math.round((oldQuiz.timeLimitSeconds || 600) / 60);
+                    categoryInput.value = oldQuiz.category || 'General Knowledge';
+
+                    questions = (oldQuiz.questions || []).map(question => ({
+                        ...question,
+                        type: question.type || 'multiple-choice',
+                        options: question.type === 'multiple-choice'
+                            ? [...(question.options || []), '', '', '', ''].slice(0, 4)
+                            : [],
+                        answer: question.answer ?? 0,
+                        explanation: question.explanation || '',
+                        image: question.image || ''
+                    }));
+
+                    pageTitle.textContent = 'Edit Quiz';
+                }
+            }
+
+            function syncCard(card, index) {
+                const question = questions[index];
+
+                question.text = card.querySelector('[data-text]')?.value.trim() || '';
+                question.explanation = card.querySelector('[data-explanation]')?.value.trim() || '';
+
+                if (question.type === 'multiple-choice') {
+                    question.options = [...card.querySelectorAll('[data-opt]')]
+                        .map(input => input.value.trim());
+
+                    const answerSelect = card.querySelector('[data-answer]');
+                    question.answer = Number(answerSelect?.value || 0);
+                } else {
+                    question.answer = card.querySelector('[data-answer]')?.value.trim() || '';
+                }
+            }
+
+            function createQuestionOptions(question) {
+                const options = [...(question.options || []), '', '', '', ''].slice(0, 4);
+
+                return options.map((option, index) => `
+                    <div class="option-row">
+                        <span class="option-letter">${String.fromCharCode(65 + index)}</span>
+                        <input
+                            data-opt="${index}"
+                            value="${QBApp.escapeHtml(option)}"
+                            placeholder="Option ${index + 1}"
+                            maxlength="150"
+                        >
+                    </div>
+                `).join('');
+            }
+
+            function createAnswerField(question) {
+                if (question.type === 'multiple-choice') {
+                    const options = [...(question.options || []), '', '', '', ''].slice(0, 4);
+
+                    return `
+                        <div class="field">
+                            <label>Correct Answer</label>
+                            <select data-answer>
+                                ${options.map((option, index) => `
+                                    <option
+                                        value="${index}"
+                                        ${Number(question.answer) === index ? 'selected' : ''}
+                                    >
+                                        ${String.fromCharCode(65 + index)} — ${QBApp.escapeHtml(option || `Option ${index + 1}`)}
+                                    </option>
+                                `).join('')}
+                            </select>
+                            <span class="hint">Choose the option that should be marked correct.</span>
+                        </div>
+                    `;
+                }
+
+                if (question.type === 'true-false') {
+                    return `
+                        <div class="field">
+                            <label>Correct Answer</label>
+                            <select data-answer>
+                                <option value="true" ${String(question.answer) === 'true' ? 'selected' : ''}>True</option>
+                                <option value="false" ${String(question.answer) === 'false' ? 'selected' : ''}>False</option>
+                            </select>
+                        </div>
+                    `;
+                }
+
+                return `
+                    <div class="field">
+                        <label>Accepted Text Answers</label>
+                        <input
+                            data-answer
+                            value="${QBApp.escapeHtml(question.answer || '')}"
+                            placeholder="Example: Seven | 7"
+                        >
+                        <span class="hint">
+                            Separate alternatives with |. Capitalisation and extra spaces are ignored.
+                        </span>
+                    </div>
+                `;
+            }
+
+            function renderQuestions() {
+                if (!questions.length) {
+                    questionsContainer.innerHTML = `
+                        <div class="card pad empty-questions">
+                            <div class="empty-icon">＋</div>
+                            <h2>No questions yet</h2>
+                            <p class="muted">
+                                Click <strong>Add Question</strong> to create your first question.
+                            </p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                questionsContainer.innerHTML = questions.map((question, index) => `
+                    <article class="card question-box" data-question-index="${index}">
+                        <div class="q-head">
+                            <div>
+                                <span class="q-number">Question ${index + 1}</span>
+                                <span class="q-status">${question.type === 'multiple-choice' ? 'Multiple Choice' : question.type === 'true-false' ? 'True / False' : 'Text Answer'}</span>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-danger" data-remove>
+                                Remove Question
+                            </button>
+                        </div>
+
+                        <div class="type-tabs">
+                            <button type="button" class="type-tab ${question.type === 'multiple-choice' ? 'active' : ''}" data-type="multiple-choice">
+                                Multiple Choice
+                            </button>
+                            <button type="button" class="type-tab ${question.type === 'true-false' ? 'active' : ''}" data-type="true-false">
+                                True / False
+                            </button>
+                            <button type="button" class="type-tab ${question.type === 'text' ? 'active' : ''}" data-type="text">
+                                Text Answer
+                            </button>
+                        </div>
+
+                        <div class="field question-prompt-field">
+                            <label for="question-${index}">Question</label>
+                            <textarea
+                                id="question-${index}"
+                                data-text
+                                rows="4"
+                                maxlength="500"
+                                placeholder="Type the complete question here..."
+                            >${QBApp.escapeHtml(question.text || '')}</textarea>
+                            <span class="hint">Give participants enough space and information to understand the question clearly.</span>
+                        </div>
+
+                        <div class="field upload-field">
+                            <label for="image-${index}">Question Image (optional)</label>
+                            <input id="image-${index}" data-image type="file" accept="image/*">
+                            <div class="upload-note">Add an image for puzzles, diagrams or visual questions. The image is resized before saving.</div>
+                            <img
+                                class="image-preview ${question.image ? '' : 'hidden'}"
+                                data-preview
+                                src="${question.image || ''}"
+                                alt="Question preview"
+                            >
+                        </div>
+
+                        ${question.type === 'multiple-choice' ? `
+                            <div class="question-options">
+                                <div class="section-label">Answer Options</div>
+                                <div class="option-grid">
+                                    ${createQuestionOptions(question)}
+                                </div>
+                            </div>
+                        ` : ''}
+
+                        ${createAnswerField(question)}
+
+                        <div class="field explanation-field">
+                            <label for="explanation-${index}">Explanation (optional)</label>
+                            <textarea
+                                id="explanation-${index}"
+                                data-explanation
+                                rows="4"
+                                maxlength="500"
+                                placeholder="Explain why the correct answer is correct. Participants will see this after submitting the quiz."
+                            >${QBApp.escapeHtml(question.explanation || '')}</textarea>
+                        </div>
+                    </article>
+                `).join('');
+
+                bindQuestionEvents();
+            }
+
+            function bindQuestionEvents() {
+                document.querySelectorAll('[data-question-index]').forEach(card => {
+                    const index = Number(card.dataset.questionIndex);
+                    const question = questions[index];
+
+                    card.querySelectorAll('[data-type]').forEach(button => {
+                        button.addEventListener('click', () => {
+                            syncCard(card, index);
+                            question.type = button.dataset.type;
+
+                            if (question.type === 'multiple-choice') {
+                                question.options = [...(question.options || []), '', '', '', ''].slice(0, 4);
+                                question.answer = Number(question.answer) || 0;
+                            } else if (question.type === 'true-false') {
+                                question.options = [];
+                                question.answer = question.answer === 'false' ? 'false' : 'true';
+                            } else {
+                                question.options = [];
+                                question.answer = typeof question.answer === 'string' ? question.answer : '';
+                            }
+
+                            renderQuestions();
+                        });
+                    });
+
+                    card.querySelector('[data-remove]').addEventListener('click', () => {
+                        questions.splice(index, 1);
+                        renderQuestions();
+                    });
+
+                    card.querySelectorAll('[data-opt]').forEach(input => {
+                        input.addEventListener('input', () => {
+                            const answerSelect = card.querySelector('[data-answer]');
+                            if (!answerSelect) return;
+
+                            const optionIndex = Number(input.dataset.opt);
+                            const option = answerSelect.options[optionIndex];
+
+                            if (option) {
+                                option.textContent = `${String.fromCharCode(65 + optionIndex)} — ${input.value.trim() || `Option ${optionIndex + 1}`}`;
+                            }
+                        });
+                    });
+
+                    const imageInput = card.querySelector('[data-image]');
+
+                    if (imageInput) {
+                        imageInput.addEventListener('change', event => {
+                            syncCard(card, index);
+
+                            const file = event.target.files?.[0];
+                            if (!file) return;
+
+                            if (!file.type.startsWith('image/')) {
+                                alert('Please select an image file.');
+                                return;
+                            }
+
+                            if (file.size > 8 * 1024 * 1024) {
+                                alert('Please choose an image smaller than 8 MB.');
+                                imageInput.value = '';
+                                return;
+                            }
+
+                            const reader = new FileReader();
+
+                            reader.onload = () => {
+                                const image = new Image();
+
+                                image.onload = () => {
+                                    const maxSize = 900;
+                                    const scale = Math.min(
+                                        1,
+                                        maxSize / Math.max(image.width, image.height)
+                                    );
+
+                                    const canvas = document.createElement('canvas');
+                                    canvas.width = Math.max(1, Math.round(image.width * scale));
+                                    canvas.height = Math.max(1, Math.round(image.height * scale));
+
+                                    const context = canvas.getContext('2d');
+                                    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+                                    question.image = canvas.toDataURL('image/jpeg', 0.82);
+
+                                    const preview = card.querySelector('[data-preview]');
+                                    preview.src = question.image;
+                                    preview.classList.remove('hidden');
+                                };
+
+                                image.src = reader.result;
+                            };
+
+                            reader.readAsDataURL(file);
+                        });
+                    }
+                });
+            }
+
+            addQuestionButton.addEventListener('click', () => {
+                document.querySelectorAll('[data-question-index]').forEach((card, index) => {
+                    syncCard(card, index);
+                });
+
+                questions.push({
+                    id: QBStorage.uid('q'),
+                    type: 'multiple-choice',
+                    text: '',
+                    options: ['', '', '', ''],
+                    answer: 0,
+                    explanation: '',
+                    image: ''
+                });
+
+                renderQuestions();
+
+                setTimeout(() => {
+                    const cards = document.querySelectorAll('[data-question-index]');
+                    cards[cards.length - 1]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    cards[cards.length - 1]?.querySelector('[data-text]')?.focus();
+                }, 50);
+            });
+
+            saveQuizButton.addEventListener('click', () => {
+                document.querySelectorAll('[data-question-index]').forEach((card, index) => {
+                    syncCard(card, index);
+                });
+
+                const title = titleInput.value.trim();
+                const description = descriptionInput.value.trim();
+                const minutes = Number(timeInput.value);
+
+                if (!title) {
+                    alert('Please enter a quiz title.');
+                    titleInput.focus();
+                    return;
+                }
+
+                if (!minutes || minutes < 1 || minutes > 120) {
+                    alert('Please enter a time limit between 1 and 120 minutes.');
+                    timeInput.focus();
+                    return;
+                }
+
+                if (!questions.length) {
+                    alert('Please add at least one question.');
+                    addQuestionButton.focus();
+                    return;
+                }
+
+                const invalidQuestion = questions.find(question => !question.text.trim());
+
+                if (invalidQuestion) {
+                    alert('Please enter every question before publishing.');
+                    return;
+                }
+
+                const invalidMcq = questions.find(question =>
+                    question.type === 'multiple-choice' &&
+                    question.options.filter(option => option.trim()).length < 2
+                );
+
+                if (invalidMcq) {
+                    alert('Each Multiple Choice question must have at least two options.');
+                    return;
+                }
+
+                const invalidCorrectOption = questions.find(question =>
+                    question.type === 'multiple-choice' &&
+                    !question.options[Number(question.answer)]?.trim()
+                );
+
+                if (invalidCorrectOption) {
+                    alert('Please enter the option selected as the correct answer.');
+                    return;
+                }
+
+                const invalidTextAnswer = questions.find(question =>
+                    question.type === 'text' && !String(question.answer || '').trim()
+                );
+
+                if (invalidTextAnswer) {
+                    alert('Please enter at least one accepted answer for every Text Answer question.');
+                    return;
+                }
+
+                const existing = editingId ? QBStorage.getQuiz(editingId) : null;
+
+                let saved;
+
+                try {
+                    saved = QBStorage.saveQuiz({
+                        id: existing?.id,
+                        title,
+                        description,
+                        category: categoryInput.value,
+                        timeLimitSeconds: minutes * 60,
+                        ownerId: user.id,
+                        ownerName: user.name,
+                        questions,
+                        code: existing?.code
+                    });
+                } catch (error) {
+                    alert(error.message || 'Could not save the quiz.');
+                    return;
+                }
+
+                message.textContent = `Quiz published successfully! Share code: ${saved.code}`;
+                message.classList.remove('hidden');
+
+                setTimeout(() => {
+                    location.href = 'quizzes.html';
+                }, 1400);
+            });
+
+            renderQuestions();
+        }
+    </script>
+</body>
+</html>

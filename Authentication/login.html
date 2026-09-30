@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Login — Quiz Builder</title>
+    <link rel="stylesheet" href="../Shared/styles.css">
+</head>
+<body>
+    <main class="auth">
+        <div class="auth-wrap">
+            <section class="card auth-card">
+                <div class="brand" style="margin-bottom: 22px;">
+                    <span class="brand-icon">💡</span>
+                    <span>
+                        <span class="brand-title">Quiz Builder</span>
+                        <span class="brand-sub">Create • Play • Learn</span>
+                    </span>
+                </div>
+
+                <h1>Welcome Back!</h1>
+                <p class="sub">Login to continue your quiz journey.</p>
+
+                <div id="error" class="error hidden"></div>
+
+                <form id="form" class="form">
+                    <div class="field">
+                        <label for="email">Email Address</label>
+                        <input id="email" type="email" required autocomplete="email">
+                    </div>
+
+                    <div class="field">
+                        <label for="password">Password</label>
+                        <input id="password" type="password" required autocomplete="current-password">
+                    </div>
+
+                    <button type="submit" class="btn btn-primary btn-block">
+                        Login
+                    </button>
+                </form>
+
+                <p class="auth-links">
+                    Don't have an account? <a href="signup.html">Sign Up</a>
+                </p>
+            </section>
+
+            <section class="auth-art">
+                <img class="mascot" src="../Shared/assets/mascot-turtle.png" alt="Cute glowing turtle mascot">
+                <div class="hand">Good things ahead!</div>
+            </section>
+        </div>
+    </main>
+
+    <script src="../Shared/storage.js"></script>
+    <script src="../Shared/app.js"></script>
+    <script>
+        const form = document.getElementById('form');
+        const emailInput = document.getElementById('email');
+        const passwordInput = document.getElementById('password');
+        const errorBox = document.getElementById('error');
+
+        form.addEventListener('submit', event => {
+            event.preventDefault();
+
+            const result = QBStorage.login(
+                emailInput.value,
+                passwordInput.value
+            );
+
+            if (!result.ok) {
+                errorBox.textContent = result.error;
+                errorBox.classList.remove('hidden');
+                return;
+            }
+
+            location.href = result.user.role === 'creator'
+                ? '../Admin/dashboard.html'
+                : '../User/join.html';
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Join Quiz — Quiz Builder</title>
+    <link rel="stylesheet" href="../Shared/styles.css">
+</head>
+<body>
+    <div data-topbar></div>
+
+    <main class="main">
+        <section class="card join-card pad">
+            <img
+                class="art"
+                src="../Shared/assets/mascot-turtle.png"
+                alt="Cute glowing turtle mascot"
+            >
+
+            <h1>Join a Quiz</h1>
+            <p>Enter the quiz code shared by your creator and start playing.</p>
+
+            <div id="error" class="error hidden"></div>
+
+            <div class="form">
+                <div class="field">
+                    <label for="code">Quiz Code</label>
+                    <input
+                        id="code"
+                        maxlength="6"
+                        autocomplete="off"
+                        placeholder="e.g. QZ1234"
+                        style="text-transform: uppercase;"
+                    >
+                </div>
+
+                <div class="field">
+                    <label for="player">Your Name</label>
+                    <input id="player" maxlength="60" placeholder="Enter your name">
+                </div>
+
+                <button type="button" class="btn btn-primary btn-block" id="find">
+                    Find Quiz
+                </button>
+            </div>
+
+            <div id="found" class="card found hidden">
+                <h2 id="foundTitle"></h2>
+                <p id="foundMeta"></p>
+                <button type="button" class="btn btn-primary" id="start">
+                    Start Quiz
+                </button>
+            </div>
+
+            <p class="center auth-links" style="margin-top: 20px;">
+                <a href="../Authentication/login.html">Login</a>
+                ·
+                <a href="../Authentication/signup.html">Sign Up</a>
+            </p>
+        </section>
+    </main>
+
+    <script src="../Shared/storage.js"></script>
+    <script src="../Shared/app.js"></script>
+    <script>
+        const sessionUser = QBStorage.session();
+
+        if (sessionUser?.role === 'creator') {
+            location.href = '../Admin/dashboard.html';
+        }
+
+        const topbar = document.querySelector('[data-topbar]');
+        const errorBox = document.getElementById('error');
+        const codeInput = document.getElementById('code');
+        const playerInput = document.getElementById('player');
+        const findButton = document.getElementById('find');
+        const foundCard = document.getElementById('found');
+        const foundTitle = document.getElementById('foundTitle');
+        const foundMeta = document.getElementById('foundMeta');
+        const startButton = document.getElementById('start');
+
+        topbar.innerHTML = `
+            <header class="topbar">
+                <a class="brand" href="../User/join.html">
+                    <span class="brand-icon">💡</span>
+                    <span>
+                        <span class="brand-title">Quiz Builder</span>
+                        <span class="brand-sub">Create • Play • Learn</span>
+                    </span>
+                </a>
+                <div class="user-chip">Participant</div>
+            </header>
+        `;
+
+        let foundQuiz = null;
+
+        findButton.addEventListener('click', () => {
+            const quiz = QBStorage.getQuizByCode(codeInput.value);
+
+            if (!quiz) {
+                errorBox.textContent = 'No quiz found with that code.';
+                errorBox.classList.remove('hidden');
+                foundCard.classList.add('hidden');
+                return;
+            }
+
+            if (!quiz.questions?.length) {
+                errorBox.textContent = 'That quiz has no questions.';
+                errorBox.classList.remove('hidden');
+                foundCard.classList.add('hidden');
+                return;
+            }
+
+            errorBox.classList.add('hidden');
+            foundQuiz = quiz;
+            foundTitle.textContent = quiz.title;
+            foundMeta.textContent = `${quiz.category || 'Quiz'} · ${quiz.questions.length} questions · ${Math.round(quiz.timeLimitSeconds / 60)} minutes`;
+            foundCard.classList.remove('hidden');
+        });
+
+        startButton.addEventListener('click', () => {
+            if (!foundQuiz) return;
+
+            const participantName = playerInput.value.trim() || 'Guest Participant';
+
+            QBStorage.setActive({
+                quizId: foundQuiz.id,
+                participantName,
+                index: 0,
+                answers: {},
+                endsAt: Date.now() + foundQuiz.timeLimitSeconds * 1000
+            });
+
+            location.href = 'play.html';
+        });
+    </script>
+</body>
+</html>
